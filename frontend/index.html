@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MATHMILLIONS</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+    
+    <main class="glass-container">
+        <nav class="tabs">
+            <button class="tab-btn active" id="tab-calc-btn">Calculer</button>
+            <button class="tab-btn" id="tab-hist-btn">Mes Prédictions</button>
+        </nav>
+
+        <section id="calc-view">
+            <header>
+                <h1>MATH<span>MILLIONS</span></h1>
+                <p>Lorsque les mathématiques rencontrent les cycles astrologiques.</p>
+            </header>
+
+            <section class="controls">
+                <div class="input-group">
+                    <label for="numGrilles">Nombre de grilles :</label>
+                    <div class="select-container">
+                        <select id="numGrilles" class="custom-select">
+                            <option value="1">1 Grille</option>
+                            <option value="2">2 Grilles</option>
+                            <option value="3">3 Grilles</option>
+                            <option value="4">4 Grilles</option>
+                            <option value="5">5 Grilles</option>
+                            <option value="6">6 Grilles</option>
+                            <option value="7" selected>7 Grilles</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button id="generate-btn" class="glow-button">
+                    <span>Lancer les chiffres</span>
+                    <div class="loader" id="btn-loader"></div>
+                </button>
+            </section>
+
+            <section id="results" class="results-container hidden">
+                <div class="results-header">
+                    <h2>Tirage du <span id="date-display">...</span></h2>
+                    <div class="moon-weight" title="Influence de la phase lunaire pour la pondération FDJ">
+                        🌕 Poids Lunaire : <span id="moon-display">...</span>
+                    </div>
+                </div>
+                
+                <div id="insight-box" class="insight-box">
+                    <!-- Insight text pushed from API -->
+                </div>
+                
+                <div id="grids-container" class="grids">
+                    <!-- Dynamically populated -->
+                </div>
+            </section>
+        </section>
+
+        <section id="history-view" class="hidden">
+            <header>
+                <h2>Historique & Validation</h2>
+                <p>Comparez vos prédictions aux tirages officiels.</p>
+            </header>
+            <div id="history-list" class="history-list">
+                <!-- Predictions populate here -->
+            </div>
+        </section>
+
+        <footer class="main-footer">
+            <a href="https://github.com/NeousAxis/mathmillions" target="_blank">
+                 ⭐ MATHMILLIONS - Open-Source sur GitHub
+            </a>
+            <p>Lorsque les mathématiques rencontrent les cycles astrologiques.</p>
+        </footer>
+    </main>
+    <script src="script.js"></script>
+</body>
+</html>
