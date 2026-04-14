@@ -165,6 +165,15 @@ document.addEventListener('DOMContentLoaded', () => {
         currentMode = mode;
         modeEuroBtn.classList.toggle('active', mode === 'euro');
         modeSwissBtn.classList.toggle('active', mode === 'swiss');
+        resultsPanel.classList.add('hidden'); // Masquer les anciens résultats pour éviter la confusion
+        
+        const title = document.querySelector('header h1');
+        if (mode === 'euro') {
+            title.innerHTML = 'MATH<span>MILLIONS</span>';
+        } else {
+            title.innerHTML = 'SWISS<span>LOTO</span>';
+        }
+
         updateSigNumOptions();
         updateSignature(sigNumSelect.value);
     }
