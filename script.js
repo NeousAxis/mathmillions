@@ -55,44 +55,53 @@ document.addEventListener('DOMContentLoaded', () => {
         return chart;
     }
 
-    function calculatePearson(X, Y) {
-        const n = X.length;
-        if (n === 0) return 0;
-        const meanX = X.reduce((a, b) => a + b) / n;
-        const meanY = Y.reduce((a, b) => a + b) / n;
-        let num = 0, denX = 0, denY = 0;
-        for (let i = 0; i < n; i++) {
-            const dx = X[i] - meanX; const dy = Y[i] - meanY;
-            num += dx * dy; denX += dx * dx; denY += dy * dy;
-        }
-        return (denX === 0 || denY === 0) ? 0 : num / Math.sqrt(denX * denY);
-    }
+
 
     function generateGrillesStatic(n_grilles) {
         const currentChart = getCurrentSkyChart();
         const activeArchive = currentMode === 'euro' ? ARCHIVES : ARCHIVES_SWISS;
         
-        const planetStats = {};
-        PLANET_KEYS.forEach(k => {
-            const values = activeArchive.map(d => d[k]);
-            const mean = values.reduce((a, b) => a + b) / values.length;
-            const std = Math.sqrt(values.map(v => Math.pow(v - mean, 2)).reduce((a, b) => a + b) / values.length);
-            planetStats[k] = { mean, std, values };
-        });
-
         function getAdjustedProbs(possibilities, colKeys) {
             let sumTotal = 0;
             const results = [];
+            const totalDraws = activeArchive.length;
+            if (totalDraws === 0) return possibilities.map(p => ({num: p, prob: 1, normalized: 1/possibilities.length}));
+
             for (let num of possibilities) {
-                const X = activeArchive.map(row => colKeys.some(k => row[k] === num) ? 1 : 0);
-                const meanX = X.reduce((a, b) => a + b) / X.length;
-                const stdX = Math.sqrt(X.map(x => Math.pow(x - meanX, 2)).reduce((a, b) => a + b) / X.length);
-                let weight = 0;
+                const wins = activeArchive.filter(row => colKeys.some(k => row[k] === num));
+                const p_base = wins.length / totalDraws; // Fréquence de base
+
+                if (wins.length === 0) {
+                    results.push({ num, prob: 0.0001, normalized: 0 });
+                    sumTotal += 0.0001;
+                    continue;
+                }
+
+                let celestial_boost = 0;
                 PLANET_KEYS.forEach(pk => {
-                    const rho = calculatePearson(X, planetStats[pk].values);
-                    if (stdX > 0 && planetStats[pk].std > 0) weight += rho * (stdX / planetStats[pk].std) * (currentChart[pk] - planetStats[pk].mean);
+                    let sum_sin = 0, sum_cos = 0;
+                    wins.forEach(w => {
+                        const rad = w[pk] * Math.PI / 180;
+                        sum_sin += Math.sin(rad);
+                        sum_cos += Math.cos(rad);
+                    });
+                    const mean_sin = sum_sin / wins.length;
+                    const mean_cos = sum_cos / wins.length;
+                    const R = Math.sqrt(mean_sin*mean_sin + mean_cos*mean_cos); // Force de la concentration (0 à 1)
+                    const avg_rad = Math.atan2(mean_sin, mean_cos); // Angle d'attraction
+                    
+                    const current_rad = currentChart[pk] * Math.PI / 180;
+                    // L'alignement est maximal (1) si la planète est au même angle, et minimal (-1) si elle est à l'opposé.
+                    const alignment = Math.cos(current_rad - avg_rad); 
+                    
+                    celestial_boost += R * alignment;
                 });
-                let prob = Math.max(0.0001, meanX + weight);
+                
+                // Utilisation d'une fonction exponentielle pour amplifier naturellement les résonances astrologiques
+                const sensitivity = 0.5; // Puissance de l'influence céleste
+                let prob = p_base * Math.exp(sensitivity * celestial_boost);
+                prob = Math.max(0.0001, prob);
+                
                 results.push({ num, prob, normalized: 0 });
                 sumTotal += prob;
             }
