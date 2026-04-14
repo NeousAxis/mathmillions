@@ -50,7 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const ecl = Astronomy.Ecliptic(equ);
             chart[`pos_${name}`] = ecl.lon;
         }
-        chart.moon_illum = Astronomy.Illumination(Astronomy.Body.Moon, time).phase;
+        const moonInfo = Astronomy.Illumination(Astronomy.Body.Moon, time);
+        chart.moon_illum = moonInfo.phase_fraction;
         return chart;
     }
 
@@ -182,19 +183,25 @@ document.addEventListener('DOMContentLoaded', () => {
     generateBtn.addEventListener('click', () => {
         generateBtn.disabled = true; btnLoader.style.display = 'block';
         setTimeout(() => {
-            const data = generateGrillesStatic(parseInt(numGrillesSelect.value));
-            dateDisplay.textContent = data.date; moonDisplay.textContent = data.moon_weight;
-            insightBox.innerHTML = `<strong>Analyse MATHMILLIONS (${currentMode.toUpperCase()}) :</strong><br>Le ciel de ce soir est corrélé aux signatures gagnantes de cette loterie.`;
-            gridsContainer.innerHTML = '';
-            data.grilles.forEach((grid, i) => {
-                const row = document.createElement('div');
-                row.className = 'grid-row';
-                row.innerHTML = `<span class="grid-id">#${i+1}</span><div class="numbers">${grid.nums.map(n => `<span class="ball">${n}</span>`).join('')}</div><span class="plus">+</span><div class="stars">${grid.etoiles.map(s => `<span class="ball star">${s}</span>`).join('')}</div>`;
-                gridsContainer.appendChild(row);
-            });
-            resultsPanel.classList.remove('hidden'); 
-            saveToLocal(data);
-            generateBtn.disabled = false; btnLoader.style.display = 'none';
+            try {
+                const data = generateGrillesStatic(parseInt(numGrillesSelect.value));
+                dateDisplay.textContent = data.date; moonDisplay.textContent = data.moon_weight;
+                insightBox.innerHTML = `<strong>Analyse MATHMILLIONS (${currentMode.toUpperCase()}) :</strong><br>Le ciel de ce soir est corrélé aux signatures gagnantes de cette loterie.`;
+                gridsContainer.innerHTML = '';
+                data.grilles.forEach((grid, i) => {
+                    const row = document.createElement('div');
+                    row.className = 'grid-row';
+                    row.innerHTML = `<span class="grid-id">#${i+1}</span><div class="numbers">${grid.nums.map(n => `<span class="ball">${n}</span>`).join('')}</div><span class="plus">+</span><div class="stars">${grid.etoiles.map(s => `<span class="ball star">${s}</span>`).join('')}</div>`;
+                    gridsContainer.appendChild(row);
+                });
+                resultsPanel.classList.remove('hidden'); 
+                saveToLocal(data);
+            } catch (err) {
+                console.error(err);
+                alert("Une erreur technique est survenue.");
+            } finally {
+                generateBtn.disabled = false; btnLoader.style.display = 'none';
+            }
         }, 500);
     });
 
