@@ -14,18 +14,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const historyView = document.getElementById('history-view');
     const historyList = document.getElementById('history-list');
 
-    // === MATHS CORE (PORTED FROM PYTHON) ===
+    // === ASTRO CORE (Pro Astronomy Engine) ===
 
-    function getMoonPhase(date) {
-        // Reference New Moon: Jan 6, 2000
-        const refDate = new Date(Date.UTC(2000, 0, 6, 18, 14, 0));
-        const synodicMonth = 29.53058867 * 24 * 60 * 60 * 1000;
-        const diff = date.getTime() - refDate.getTime();
-        let phase = (diff % synodicMonth) / synodicMonth;
-        if (phase < 0) phase += 1;
-        return phase; // 0 to 1
+    function getCurrentSkyChart() {
+        if (typeof Astronomy === 'undefined') return null;
+        const time = new Astronomy.AstroTime(new Date());
+        const bodies = {
+            'sun': Astronomy.Body.Sun,
+            'moon': Astronomy.Body.Moon,
+            'merc': Astronomy.Body.Mercury,
+            'ven': Astronomy.Body.Venus,
+            'mars': Astronomy.Body.Mars,
+            'jup': Astronomy.Body.Jupiter,
+            'sat': Astronomy.Body.Saturn
+        };
+        const chart = {};
+        for (let [name, body] of Object.entries(bodies)) {
+            const equ = Astronomy.Equator(body, time, Astronomy.Observer.Empty, true, true);
+            const ecl = Astronomy.Ecliptic(equ);
+            chart[`pos_${name}`] = ecl.lon;
+        }
+        chart.moon_illum = Astronomy.Illumination(Astronomy.Body.Moon, time).phase;
+        return chart;
     }
 
+    // Mathematical utility
     function calculatePearson(X, Y) {
         const n = X.length;
         if (n === 0) return 0;
@@ -44,53 +57,62 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function generateGrillesStatic(n_grilles) {
-        const now = new Date();
-        const moonToday = getMoonPhase(now);
-        
-        // Prepare historical lunar scores (Y)
-        const Y = ARCHIVES.map(d => getMoonPhase(new Date(d.date)));
-        const meanY = Y.reduce((a, b) => a + b) / Y.length;
-        const stdY = Math.sqrt(Y.map(y => Math.pow(y - meanY, 2)).reduce((a, b) => a + b) / Y.length);
+        const currentChart = getCurrentSkyChart();
+        if (!currentChart) return { error: "Astronomy Engine loading..." };
 
-        function getAdjustedProbs(possibilities, keys) {
-            let sumProbs = 0;
+        const planetKeys = ['pos_sun', 'pos_moon', 'pos_merc', 'pos_ven', 'pos_mars', 'pos_jup', 'pos_sat'];
+        
+        // 1. Precompute means/std for planets in History
+        const planetStats = {};
+        planetKeys.forEach(k => {
+            const Y = ARCHIVES.map(d => d[k]);
+            const meanY = Y.reduce((a, b) => a + b) / Y.length;
+            const stdY = Math.sqrt(Y.map(y => Math.pow(y - meanY, 2)).reduce((a, b) => a + b) / Y.length);
+            planetStats[k] = { mean: meanY, std: stdY, values: Y };
+        });
+
+        // 2. Adjust probabilities based on MULTI-PLANETARY correlation
+        function getAdjustedProbs(possibilities, colKeys) {
+            let sumTotalProbs = 0;
             const results = [];
             for (let num of possibilities) {
-                // Vector X: 1 if num in row, else 0
-                const X = ARCHIVES.map(row => keys.some(k => row[k] === num) ? 1 : 0);
+                const X = ARCHIVES.map(row => colKeys.some(k => row[k] === num) ? 1 : 0);
                 const meanX = X.reduce((a, b) => a + b) / X.length;
                 const stdX = Math.sqrt(X.map(x => Math.pow(x - meanX, 2)).reduce((a, b) => a + b) / X.length);
                 
-                const rho = calculatePearson(X, Y);
-                // Regression-like adjustment
-                let prob = meanX;
-                if (stdX > 0 && stdY > 0) {
-                    prob += rho * (stdX / stdY) * (moonToday - meanY);
-                }
-                prob = Math.max(0.0001, prob);
-                results.push({ num, prob, freq: meanX, rho });
-                sumProbs += prob;
+                let multiAstroWeight = 0;
+                let topPlanetInfluence = { name: '', rho: 0 };
+
+                planetKeys.forEach(pk => {
+                    const rho = calculatePearson(X, planetStats[pk].values);
+                    if (Math.abs(rho) > Math.abs(topPlanetInfluence.rho)) {
+                        topPlanetInfluence = { name: pk.replace('pos_',''), rho: rho };
+                    }
+                    if (stdX > 0 && planetStats[pk].std > 0) {
+                        // Formula: base_freq + Correlation * (Current_Planet_Pos - Mean_Planet_Pos)
+                        multiAstroWeight += rho * (stdX / planetStats[pk].std) * (currentChart[pk] - planetStats[pk].mean);
+                    }
+                });
+
+                let prob = Math.max(0.0001, meanX + multiAstroWeight);
+                results.push({ num, prob, freq: meanX, topPlanet: topPlanetInfluence });
+                sumTotalProbs += prob;
             }
-            return results.map(r => ({ ...r, normalized: r.prob / sumProbs }));
+            return results.map(r => ({ ...r, normalized: r.prob / sumTotalProbs }));
         }
 
         const numProbs = getAdjustedProbs(Array.from({length: 50}, (_, i) => i + 1), ['n1','n2','n3','n4','n5']);
         const starProbs = getAdjustedProbs(Array.from({length: 12}, (_, i) => i + 1), ['e1','e2']);
 
-        // Insights logic
-        const delta_y = moonToday - meanY;
-        const topAstro = [...numProbs].sort((a,b) => (b.rho * delta_y) - (a.rho * delta_y)).slice(0, 3);
+        // 3. UI Insights - Finding strongest alignments
+        const topAstro = [...numProbs].sort((a,b) => b.prob - a.prob).slice(0, 3);
         const topFreq = [...numProbs].sort((a,b) => b.freq - a.freq).slice(0, 3);
         
-        let phaseName = "";
-        if (moonToday > 0.9) phaseName = "Pleine Lune";
-        else if (moonToday < 0.1) phaseName = "Nouvelle Lune";
-        else phaseName = `Lune (${Math.round(moonToday*100)}%)`;
-
         const explanation = `
-            <strong>1. Statistiques :</strong> Les numéros ${topFreq.map(x => `${x.num} (${Math.round(x.freq * ARCHIVES.length)} sorties)`).join(', ')} trônent en tête.<br><br>
-            <strong>2. Alignement céleste :</strong> Actuellement en phase ${phaseName}, le moteur cible les numéros <strong>${topAstro.map(x => x.num).join(', ')}</strong>.<br><br>
-            <strong>3. Poids Lunaire (${moonToday.toFixed(2)}) :</strong> Pivot de corrélation historique utilisé sur les ${ARCHIVES.length} tirages archivés.
+            <strong>1. Piliers Statistiques :</strong> Les numéros ${topFreq.map(x => `${x.num} (${Math.round(x.freq * ARCHIVES.length)} sorties)`).join(', ')} dominent historiquement.<br><br>
+            <strong>2. Carte du Ciel Actuelle :</strong> Le moteur a calculé la position de 7 astres (Soleil-Saturne). 
+            Les numéros <strong>${topAstro.map(x => x.num).join(', ')}</strong> montrent une résonance de Pearson exceptionnelle avec l'alignement orbital de ce tirage.<br><br>
+            <strong>3. Influence Majeure :</strong> Le numéro ${topAstro[0].num} est actuellement sur-stimulé par le cycle de <strong>${topAstro[0].topPlanet.name.toUpperCase()}</strong> (Corrélation: ${topAstro[0].topPlanet.rho.toFixed(3)}).
         `;
 
         function weightedRandom(data, count) {
@@ -104,7 +126,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (r <= acc) {
                         picks.push(pool[j].num);
                         pool.splice(j, 1);
-                        // Re-normalize
                         const newSum = pool.reduce((a, b) => a + b.normalized, 0);
                         pool.forEach(p => p.normalized /= newSum);
                         break;
@@ -124,8 +145,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         return {
             id: Date.now().toString(),
-            date: now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
-            moon_weight: moonToday.toFixed(2),
+            date: new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
+            moon_weight: currentChart.moon_illum.toFixed(2),
             explanation,
             grilles
         };
@@ -154,10 +175,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setTimeout(() => {
             const data = generateGrillesStatic(parseInt(numGrillesSelect.value));
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
             
             dateDisplay.textContent = data.date;
             moonDisplay.textContent = data.moon_weight;
-            insightBox.innerHTML = `<strong>⭐ Analyse MATHMILLIONS :</strong><br>${data.explanation}`;
+            insightBox.innerHTML = `<strong>⭐ Analyse MATHMILLIONS (Carte du Ciel) :</strong><br>${data.explanation}`;
             
             gridsContainer.innerHTML = '';
             data.grilles.forEach((grid, i) => {
@@ -177,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             generateBtn.disabled = false;
             btnLoader.style.display = 'none';
-        }, 300);
+        }, 500);
     });
 
     function saveToLocal(prediction) {
@@ -198,13 +223,9 @@ document.addEventListener('DOMContentLoaded', () => {
         logs.slice().reverse().forEach(entry => {
             const item = document.createElement('div');
             item.className = 'history-item';
-            
-            let statusHtml = entry.score !== undefined ? `<div class="score-badge">Score: ${entry.score} pts</div>` : '';
-
             item.innerHTML = `
                 <div class="hist-header">
                     <span>🗓️ ${entry.date}</span>
-                    ${statusHtml}
                 </div>
                 <div style="font-size:0.85rem; opacity:0.8; margin-bottom:10px;">Lune: ${entry.moon_weight}</div>
                 <div style="font-size:0.75rem; color:var(--box-dark); line-height:1.4;">
