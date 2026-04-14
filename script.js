@@ -42,13 +42,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getCurrentSkyChart() {
         const time = new Astronomy.AstroTime(new Date());
-        const observer = new Astronomy.Observer(48.8566, 2.3522, 0);
         const bodies = { 'sun': Astronomy.Body.Sun, 'moon': Astronomy.Body.Moon, 'merc': Astronomy.Body.Mercury, 'ven': Astronomy.Body.Venus, 'mars': Astronomy.Body.Mars, 'jup': Astronomy.Body.Jupiter, 'sat': Astronomy.Body.Saturn };
         const chart = {};
         for (let [name, body] of Object.entries(bodies)) {
-            const equ = Astronomy.Equator(body, time, observer, true, true);
-            const ecl = Astronomy.Ecliptic(equ);
-            chart[`pos_${name}`] = ecl.lon;
+            chart[`pos_${name}`] = Astronomy.EclipticLongitude(body, time);
         }
         const moonInfo = Astronomy.Illumination(Astronomy.Body.Moon, time);
         chart.moon_illum = moonInfo.phase_fraction;
