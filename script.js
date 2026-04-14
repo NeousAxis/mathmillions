@@ -45,7 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const bodies = { 'sun': Astronomy.Body.Sun, 'moon': Astronomy.Body.Moon, 'merc': Astronomy.Body.Mercury, 'ven': Astronomy.Body.Venus, 'mars': Astronomy.Body.Mars, 'jup': Astronomy.Body.Jupiter, 'sat': Astronomy.Body.Saturn };
         const chart = {};
         for (let [name, body] of Object.entries(bodies)) {
-            chart[`pos_${name}`] = Astronomy.EclipticLongitude(body, time);
+            const vec = Astronomy.GeoVector(body, time, true);
+            chart[`pos_${name}`] = Astronomy.Ecliptic(vec).elon;
         }
         const moonInfo = Astronomy.Illumination(Astronomy.Body.Moon, time);
         chart.moon_illum = moonInfo.phase_fraction;
