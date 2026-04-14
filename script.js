@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveToLocal(data);
             } catch (err) {
                 console.error(err);
-                alert("Une erreur technique est survenue.");
+                document.body.innerHTML += "<div id='test-error' style='position:absolute;top:0;left:0;background:red;color:white;z-index:9999;padding:20px;'>" + err.message + "<br><pre>" + err.stack + "</pre></div>";
             } finally {
                 generateBtn.disabled = false; btnLoader.style.display = 'none';
             }
