@@ -10,11 +10,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const tabCalcBtn = document.getElementById('tab-calc-btn');
     const tabHistBtn = document.getElementById('tab-hist-btn');
+    const tabSigBtn = document.getElementById('tab-sig-btn');
+    
     const calcView = document.getElementById('calc-view');
     const historyView = document.getElementById('history-view');
+    const signatureView = document.getElementById('signature-view');
+    
     const historyList = document.getElementById('history-list');
+    const sigNumSelect = document.getElementById('sig-num-select');
+    const sigReport = document.getElementById('sig-report');
+    const sigChart = document.getElementById('sig-chart');
 
-    // === ASTRO CORE (Pro Astronomy Engine) ===
+    // Populate Number Selector for Signature
+    for (let i = 1; i <= 50; i++) {
+        const opt = document.createElement('option');
+        opt.value = i; opt.textContent = i;
+        sigNumSelect.appendChild(opt);
+    }
+
+    const PLANET_KEYS = ['pos_sun', 'pos_moon', 'pos_merc', 'pos_ven', 'pos_mars', 'pos_jup', 'pos_sat'];
+    const ZODIAC = ["Bélier", "Taureau", "Gémeaux", "Cancer", "Lion", "Vierge", "Balance", "Scorpion", "Sagittaire", "Capricorne", "Verseau", "Poissons"];
+
+    function getSign(lon) {
+        return ZODIAC[Math.floor((lon % 360) / 30)];
+    }
+
+    // === ASTRO CORE ===
 
     function getCurrentSkyChart() {
         if (typeof Astronomy === 'undefined') return null;
@@ -38,7 +59,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return chart;
     }
 
-    // Mathematical utility
     function calculatePearson(X, Y) {
         const n = X.length;
         if (n === 0) return 0;
@@ -58,20 +78,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function generateGrillesStatic(n_grilles) {
         const currentChart = getCurrentSkyChart();
-        if (!currentChart) return { error: "Astronomy Engine loading..." };
+        if (!currentChart) return { error: "Moteur astronomique en cours de chargement..." };
 
-        const planetKeys = ['pos_sun', 'pos_moon', 'pos_merc', 'pos_ven', 'pos_mars', 'pos_jup', 'pos_sat'];
-        
-        // 1. Precompute means/std for planets in History
         const planetStats = {};
-        planetKeys.forEach(k => {
+        PLANET_KEYS.forEach(k => {
             const Y = ARCHIVES.map(d => d[k]);
             const meanY = Y.reduce((a, b) => a + b) / Y.length;
             const stdY = Math.sqrt(Y.map(y => Math.pow(y - meanY, 2)).reduce((a, b) => a + b) / Y.length);
             planetStats[k] = { mean: meanY, std: stdY, values: Y };
         });
 
-        // 2. Adjust probabilities based on MULTI-PLANETARY correlation
         function getAdjustedProbs(possibilities, colKeys) {
             let sumTotalProbs = 0;
             const results = [];
@@ -81,21 +97,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const stdX = Math.sqrt(X.map(x => Math.pow(x - meanX, 2)).reduce((a, b) => a + b) / X.length);
                 
                 let multiAstroWeight = 0;
-                let topPlanetInfluence = { name: '', rho: 0 };
+                let topInfluence = { name: '', rho: 0 };
 
-                planetKeys.forEach(pk => {
+                PLANET_KEYS.forEach(pk => {
                     const rho = calculatePearson(X, planetStats[pk].values);
-                    if (Math.abs(rho) > Math.abs(topPlanetInfluence.rho)) {
-                        topPlanetInfluence = { name: pk.replace('pos_',''), rho: rho };
-                    }
+                    if (Math.abs(rho) > Math.abs(topInfluence.rho)) topInfluence = { name: pk.replace('pos_',''), rho };
                     if (stdX > 0 && planetStats[pk].std > 0) {
-                        // Formula: base_freq + Correlation * (Current_Planet_Pos - Mean_Planet_Pos)
                         multiAstroWeight += rho * (stdX / planetStats[pk].std) * (currentChart[pk] - planetStats[pk].mean);
                     }
                 });
 
                 let prob = Math.max(0.0001, meanX + multiAstroWeight);
-                results.push({ num, prob, freq: meanX, topPlanet: topPlanetInfluence });
+                results.push({ num, prob, freq: meanX, topInfluence });
                 sumTotalProbs += prob;
             }
             return results.map(r => ({ ...r, normalized: r.prob / sumTotalProbs }));
@@ -104,23 +117,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const numProbs = getAdjustedProbs(Array.from({length: 50}, (_, i) => i + 1), ['n1','n2','n3','n4','n5']);
         const starProbs = getAdjustedProbs(Array.from({length: 12}, (_, i) => i + 1), ['e1','e2']);
 
-        // 3. UI Insights - Finding strongest alignments
         const topAstro = [...numProbs].sort((a,b) => b.prob - a.prob).slice(0, 3);
-        const topFreq = [...numProbs].sort((a,b) => b.freq - a.freq).slice(0, 3);
         
         const explanation = `
-            <strong>1. Piliers Statistiques :</strong> Les numéros ${topFreq.map(x => `${x.num} (${Math.round(x.freq * ARCHIVES.length)} sorties)`).join(', ')} dominent historiquement.<br><br>
-            <strong>2. Carte du Ciel Actuelle :</strong> Le moteur a calculé la position de 7 astres (Soleil-Saturne). 
-            Les numéros <strong>${topAstro.map(x => x.num).join(', ')}</strong> montrent une résonance de Pearson exceptionnelle avec l'alignement orbital de ce tirage.<br><br>
-            <strong>3. Influence Majeure :</strong> Le numéro ${topAstro[0].num} est actuellement sur-stimulé par le cycle de <strong>${topAstro[0].topPlanet.name.toUpperCase()}</strong> (Corrélation: ${topAstro[0].topPlanet.rho.toFixed(3)}).
+            <strong>Alignement Céleste :</strong> Le ciel actuel résonne fortement avec les signatures de sortie des numéros <strong>${topAstro.map(x => x.num).join(', ')}</strong>.<br><br>
+            <strong>Facteur Clé :</strong> Le numéro ${topAstro[0].num} bénéficie d'une corrélation de Pearson de ${topAstro[0].topInfluence.rho.toFixed(3)} avec le cycle de ${topAstro[0].topInfluence.name.toUpperCase()}.
         `;
 
         function weightedRandom(data, count) {
             const picks = [];
             const pool = [...data];
             for (let i = 0; i < count; i++) {
-                let r = Math.random();
-                let acc = 0;
+                let r = Math.random(), acc = 0;
                 for (let j = 0; j < pool.length; j++) {
                     acc += pool[j].normalized;
                     if (r <= acc) {
@@ -137,10 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const grilles = [];
         for (let i = 0; i < n_grilles; i++) {
-            grilles.push({
-                nums: weightedRandom(numProbs, 5),
-                etoiles: weightedRandom(starProbs, 2)
-            });
+            grilles.push({ nums: weightedRandom(numProbs, 5), etoiles: weightedRandom(starProbs, 2) });
         }
 
         return {
@@ -152,38 +157,65 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    // === SIGNATURE ANALYSIS ===
+
+    function updateSignature(num) {
+        num = parseInt(num);
+        const winningDraws = ARCHIVES.filter(row => ['n1','n2','n3','n4','n5'].some(k => row[k] === num));
+        const totalWins = winningDraws.length;
+
+        if (totalWins === 0) {
+            sigReport.textContent = "Aucun historique pour ce numéro.";
+            sigChart.innerHTML = "";
+            return;
+        }
+
+        let report = `Le numéro <strong>${num}</strong> est sorti <strong>${totalWins} fois</strong> depuis 2004.<br>Voici sa signature céleste moyenne lors de ses victoires :`;
+        sigReport.innerHTML = report;
+
+        sigChart.innerHTML = "";
+        PLANET_KEYS.forEach(pk => {
+            const positions = winningDraws.map(d => d[pk]);
+            const avgPos = positions.reduce((a, b) => a + b) / totalWins;
+            const sign = getSign(avgPos);
+            
+            const row = document.createElement('div');
+            row.className = 'sig-row';
+            row.innerHTML = `
+                <span class="sig-planet">${pk.replace('pos_','')}</span>
+                <span class="sig-pos">${Math.round(avgPos)}° (${sign})</span>
+                <div class="sig-bar-container">
+                    <div class="sig-bar" style="width: ${(avgPos/360)*100}%"></div>
+                </div>
+            `;
+            sigChart.appendChild(row);
+        });
+    }
+
     // === UI CONTROLLER ===
 
-    tabCalcBtn.addEventListener('click', () => {
-        tabCalcBtn.classList.add('active');
-        tabHistBtn.classList.remove('active');
-        calcView.classList.remove('hidden');
-        historyView.classList.add('hidden');
-    });
+    function switchTab(tab) {
+        [tabCalcBtn, tabHistBtn, tabSigBtn].forEach(b => b.classList.remove('active'));
+        [calcView, historyView, signatureView].forEach(v => v.classList.add('hidden'));
+        
+        if (tab === 'calc') { tabCalcBtn.classList.add('active'); calcView.classList.remove('hidden'); }
+        if (tab === 'hist') { tabHistBtn.classList.add('active'); historyView.classList.remove('hidden'); loadHistory(); }
+        if (tab === 'sig') { tabSigBtn.classList.add('active'); signatureView.classList.remove('hidden'); updateSignature(sigNumSelect.value); }
+    }
 
-    tabHistBtn.addEventListener('click', () => {
-        tabHistBtn.classList.add('active');
-        tabCalcBtn.classList.remove('active');
-        historyView.classList.remove('hidden');
-        calcView.classList.add('hidden');
-        loadHistory();
-    });
+    tabCalcBtn.addEventListener('click', () => switchTab('calc'));
+    tabHistBtn.addEventListener('click', () => switchTab('hist'));
+    tabSigBtn.addEventListener('click', () => switchTab('sig'));
+    sigNumSelect.addEventListener('change', () => updateSignature(sigNumSelect.value));
 
     generateBtn.addEventListener('click', () => {
-        generateBtn.disabled = true;
-        btnLoader.style.display = 'block';
-
+        generateBtn.disabled = true; btnLoader.style.display = 'block';
         setTimeout(() => {
             const data = generateGrillesStatic(parseInt(numGrillesSelect.value));
-            if (data.error) {
-                alert(data.error);
-                return;
-            }
-            
+            if (data.error) { alert(data.error); return; }
             dateDisplay.textContent = data.date;
             moonDisplay.textContent = data.moon_weight;
-            insightBox.innerHTML = `<strong>⭐ Analyse MATHMILLIONS (Carte du Ciel) :</strong><br>${data.explanation}`;
-            
+            insightBox.innerHTML = `<strong>⭐ Analyse MATHMILLIONS :</strong><br>${data.explanation}`;
             gridsContainer.innerHTML = '';
             data.grilles.forEach((grid, i) => {
                 const row = document.createElement('div');
@@ -196,12 +228,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 gridsContainer.appendChild(row);
             });
-
             resultsPanel.classList.remove('hidden');
             saveToLocal(data);
-
-            generateBtn.disabled = false;
-            btnLoader.style.display = 'none';
+            generateBtn.disabled = false; btnLoader.style.display = 'none';
         }, 500);
     });
 
@@ -213,20 +242,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function loadHistory() {
         const logs = JSON.parse(localStorage.getItem('mathmillions_logs') || '[]');
-        historyList.innerHTML = '';
-
-        if (logs.length === 0) {
-            historyList.innerHTML = '<p style="text-align:center; opacity:0.6; margin-top:2rem;">Aucune prédiction enregistrée.</p>';
-            return;
-        }
-
+        historyList.innerHTML = logs.length === 0 ? '<p style="text-align:center; opacity:0.6; margin-top:2rem;">Aucune prédiction enregistrée.</p>' : '';
         logs.slice().reverse().forEach(entry => {
             const item = document.createElement('div');
             item.className = 'history-item';
             item.innerHTML = `
-                <div class="hist-header">
-                    <span>🗓️ ${entry.date}</span>
-                </div>
+                <div class="hist-header"><span>🗓️ ${entry.date}</span></div>
                 <div style="font-size:0.85rem; opacity:0.8; margin-bottom:10px;">Lune: ${entry.moon_weight}</div>
                 <div style="font-size:0.75rem; color:var(--box-dark); line-height:1.4;">
                     ${entry.grilles.map(g => g.nums.join(',') + ' [' + g.etoiles.join(',') + ']').join('<br>')}
