@@ -40,13 +40,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const ZODIAC = ["Bélier", "Taureau", "Gémeaux", "Cancer", "Lion", "Vierge", "Balance", "Scorpion", "Sagittaire", "Capricorne", "Verseau", "Poissons"];
     function getSign(lon) { return ZODIAC[Math.floor((lon % 360) / 30)]; }
 
-    // === ASTRO CORE ===
     function getCurrentSkyChart() {
         const time = new Astronomy.AstroTime(new Date());
+        const observer = Astronomy.MakeObserver(48.8566, 2.3522, 0);
         const bodies = { 'sun': Astronomy.Body.Sun, 'moon': Astronomy.Body.Moon, 'merc': Astronomy.Body.Mercury, 'ven': Astronomy.Body.Venus, 'mars': Astronomy.Body.Mars, 'jup': Astronomy.Body.Jupiter, 'sat': Astronomy.Body.Saturn };
         const chart = {};
         for (let [name, body] of Object.entries(bodies)) {
-            const equ = Astronomy.Equator(body, time, Astronomy.Observer.Empty, true, true);
+            const equ = Astronomy.Equator(body, time, observer, true, true);
             const ecl = Astronomy.Ecliptic(equ);
             chart[`pos_${name}`] = ecl.lon;
         }
