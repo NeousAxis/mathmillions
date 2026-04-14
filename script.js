@@ -172,6 +172,11 @@ document.addEventListener('DOMContentLoaded', () => {
         calcView.classList.remove('hidden'); historyView.classList.add('hidden'); signatureView.classList.add('hidden');
         [tabCalcBtn, tabHistBtn, tabSigBtn].forEach(b => b.classList.remove('active')); tabCalcBtn.classList.add('active');
     });
+    tabHistBtn.addEventListener('click', () => {
+        calcView.classList.add('hidden'); historyView.classList.remove('hidden'); signatureView.classList.add('hidden');
+        [tabCalcBtn, tabHistBtn, tabSigBtn].forEach(b => b.classList.remove('active')); tabHistBtn.classList.add('active');
+        loadHistory();
+    });
     sigNumSelect.addEventListener('change', () => updateSignature(sigNumSelect.value));
 
     generateBtn.addEventListener('click', () => {
@@ -187,7 +192,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.innerHTML = `<span class="grid-id">#${i+1}</span><div class="numbers">${grid.nums.map(n => `<span class="ball">${n}</span>`).join('')}</div><span class="plus">+</span><div class="stars">${grid.etoiles.map(s => `<span class="ball star">${s}</span>`).join('')}</div>`;
                 gridsContainer.appendChild(row);
             });
-            resultsPanel.classList.remove('hidden'); generateBtn.disabled = false; btnLoader.style.display = 'none';
+            resultsPanel.classList.remove('hidden'); 
+            saveToLocal(data);
+            generateBtn.disabled = false; btnLoader.style.display = 'none';
         }, 500);
     });
+
+    function saveToLocal(prediction) {
+        prediction.mode = currentMode;
+        const logs = JSON.parse(localStorage.getItem('mathmillions_logs') || '[]');
+        logs.push(prediction);
+        localStorage.setItem('mathmillions_logs', JSON.stringify(logs));
+    }
+
+    function loadHistory() {
+        const logs = JSON.parse(localStorage.getItem('mathmillions_logs') || '[]');
+        historyList.innerHTML = logs.length === 0 ? '<p style="text-align:center; opacity:0.6; margin-top:2rem;">Aucune prédiction enregistrée.</p>' : '';
+        logs.slice().reverse().forEach(entry => {
+            const item = document.createElement('div');
+            item.className = 'history-item';
+            const modeName = entry.mode ? entry.mode.toUpperCase() : 'EURO';
+            item.innerHTML = `
+                <div class="hist-header"><span>🗓️ ${entry.date} (${modeName})</span></div>
+                <div style="font-size:0.85rem; opacity:0.8; margin-bottom:10px;">Lune: ${entry.moon_weight}</div>
+                <div style="font-size:0.75rem; color:var(--box-dark); line-height:1.4;">
+                    ${entry.grilles.map(g => g.nums.join(',') + ' [' + g.etoiles.join(',') + ']').join('<br>')}
+                </div>
+            `;
+            historyList.appendChild(item);
+        });
+    }
 });
